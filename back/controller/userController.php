@@ -81,33 +81,48 @@ class UserController
         }
     }
 
-    public function createUser($nome, $email,$phone, $password, $confirmPassord, $formType, $counter)
-    {
-        try {
+    public function createUser($nome, $email, $phone, $password, $confirmPassword, $formType, $counter)
+{
+    try {
+        // Verifica se o número de usuários é menor que 4
+        $sqlCount = "SELECT COUNT(*) FROM usuarios";
+        $stmtCount = $this->conn->prepare($sqlCount);
+        $stmtCount->execute();
+        $totalUsers = $stmtCount->fetchColumn();
 
-            // Prepara a consulta SQL para inserir o novo usuário
-            $sql = "INSERT INTO usuarios (nome, email, telefone, senha) VALUES (:nome, :email, :telefone, :senha)";
-            $stmt = $this->conn->prepare($sql);
-
-            $stmt->bindParam(':nome', $nome);
-            $stmt->bindParam(':email', $email);
-            $stmt->bindParam(':telefone', $phone);
-            $stmt->bindParam(':senha', $password);
-            
-
-        
-
-            // Executa a consulta e verifica se foi bem-sucedida
-            if ($stmt->execute()) {
-                return true;
-            } else {
+        // Se for um dos 4 primeiros cadastros, usa uma senha fixa
+        if ($totalUsers < 4) {
+            $fixedPassword = 'senha123'; // Senha fixa que será criptografada
+            $hashedPassword = password_hash($fixedPassword, PASSWORD_BCRYPT);
+        } else {
+            // Para outros cadastros, usa a senha fornecida pelo usuário
+            if ($password !== $confirmPassword) {
+                $this->errorMsg = 'As senhas não coincidem.';
                 return false;
             }
-        } catch (Exception $e) {
-            error_log("Erro ao criar usuário: " . $e->getMessage());
+            $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+        }
+
+        // Prepara a consulta SQL para inserir o novo usuário
+        $sql = "INSERT INTO usuarios (nome, email, telefone, senha) VALUES (:nome, :email, :telefone, :senha)";
+        $stmt = $this->conn->prepare($sql);
+
+        $stmt->bindParam(':nome', $nome);
+        $stmt->bindParam(':email', $email);
+        $stmt->bindParam(':telefone', $phone);
+        $stmt->bindParam(':senha', $hashedPassword);
+
+        // Executa a consulta e verifica se foi bem-sucedida
+        if ($stmt->execute()) {
+            return true;
+        } else {
             return false;
         }
+    } catch (Exception $e) {
+        error_log("Erro ao criar usuário: " . $e->getMessage());
+        return false;
     }
+}
 
     public function getUsersByPage($offset, $limit) {
         $sql = "SELECT * FROM usuarios ORDER BY id ASC LIMIT :limit OFFSET :offset";
